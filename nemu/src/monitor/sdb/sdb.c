@@ -15,6 +15,7 @@
 
 #include <isa.h>
 #include <cpu/cpu.h>
+#include <memory/paddr.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 #include "sdb.h"
@@ -47,6 +48,67 @@ static int cmd_c(char *args) {
   return 0;
 }
 
+static int cmd_si(char *args) {
+  int n = 1;
+  if (args != NULL) {
+    n = atoi(args);
+    if (n <= 0) {
+      printf("Invalid argument: %s\n", args);
+      return 0;
+    }
+  }
+  cpu_exec(n);
+  return 0;
+}
+
+static int cmd_info(char *args) {
+  if (args == NULL) {
+    printf("Usage: info r - display registers\n");
+    printf("Usage: info w - display watchpoints\n");
+    return 0;
+  }
+  if (strcmp(args, "r") == 0) {
+    isa_reg_display();
+    return 0;
+  }
+  if (strcmp(args, "w") == 0) {
+    // TODO: implement watchpoint display
+    printf("Watchpoint display not implemented yet\n");
+    return 0;
+  }
+  printf("Unknown subcommand '%s'\n", args);
+  return 0;
+}
+
+static int cmd_x(char *args) {
+  if (args == NULL) {
+    printf("Usage: x N EXPR - scan memory\n");
+    return 0;
+  }
+  char *n_str = strtok(args, " ");
+  char *expr_str = strtok(NULL, " ");
+  if (n_str == NULL || expr_str == NULL) {
+    printf("Usage: x N EXPR - scan memory\n");
+    return 0;
+  }
+  int n = atoi(n_str);
+  if (n <= 0) {
+    printf("Invalid N: %s\n", n_str);
+    return 0;
+  }
+  // Simplified version: EXPR is just a hex number
+  paddr_t addr;
+  if (sscanf(expr_str, "%x", &addr) != 1) {
+    printf("Invalid expression: %s (expect hex number)\n", expr_str);
+    return 0;
+  }
+  for (int i = 0; i < n; i++) {
+    word_t data = paddr_read(addr, 4);
+    printf("0x%08x: 0x%08x\n", addr, data);
+    addr += 4;
+  }
+  return 0;
+}
 
 static int cmd_q(char *args) {
   return -1;
@@ -62,6 +124,9 @@ static struct {
   { "help", "Display information about all supported commands", cmd_help },
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
+  { "si", "Single step execution, N steps by default (1 step when N is not given)", cmd_si },
+  { "info", "Print program status, 'r' for registers, 'w' for watchpoints", cmd_info },
+  { "x", "Scan memory: x N EXPR, print N consecutive 4-bytes from address EXPR", cmd_x },
 
   /* TODO: Add more commands */
 
