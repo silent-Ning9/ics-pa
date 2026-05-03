@@ -156,30 +156,25 @@ static int find_main_op(int p, int q) {
 
   // Find the operator with lowest priority that is not in parentheses
   int balance = 0;
-  for (int i = 0; i < nr_token; i++) {
+  for (int i = p; i <= q; i++) {
     if (tokens[i].type == '(') balance++;
     else if (tokens[i].type == ')') balance--;
-    else if (balance == 0 && i >= p && i <= q) {
-      // Not in parentheses and in range [p, q], check if it's an operator
+    else if (balance == 0) {
+      // Not in parentheses, check if it's an operator
       int prio = 0;
       if (tokens[i].type == '+' || tokens[i].type == '-') prio = 3;
       else if (tokens[i].type == '*' || tokens[i].type == '/') prio = 2;
       else prio = 0;
 
-      if (prio > 0) {
-        if (prio < min_prio) {
-          op = i;
-          min_prio = prio;
-        } else if (prio == min_prio) {
-          // Same priority: right-associative, choose the rightmost
-          op = i;
-        }
+      if (prio > 0 && prio < min_prio) {
+        op = i;
+        min_prio = prio;
+      } else if (prio > 0 && prio == min_prio) {
+        // Same priority: right-associative, choose the rightmost
+        op = i;
       }
     }
   }
-
-  // Debug: print found main operator
-  // printf("Main op at %d, type %d\n", op, op >= 0 ? tokens[op].type : -1);
 
   return op;
 }
