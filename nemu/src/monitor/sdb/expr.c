@@ -48,9 +48,11 @@ static struct rule {
   {"\\(", '('},         // left parenthesis
   {"\\)", ')'},         // right parenthesis
   {"0x[0-9a-fA-F]+", TK_HEX},  // hex number
-  {"[0-9]+", TK_NUM},   // decimal number
+  // {"[0-9]+", TK_NUM},   // decimal number
   {"\\$[a-zA-Z0-9]+", TK_REG}, // register
   {"==", TK_EQ},        // equal
+  // 注意最后的 [uU]? 表示可选的字符 u 或 U
+  {"[0-9]+[uU]?", TK_NUM},
 };
 
 #define NR_REGEX ARRLEN(rules)
