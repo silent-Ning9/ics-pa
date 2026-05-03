@@ -173,6 +173,9 @@ static int find_main_op(int p, int q) {
     }
   }
 
+  // Debug: print found main operator
+  printf("Main op at %d, type %d\n", op, op >= 0 ? tokens[op].type : -1);
+
   return op;
 }
 
