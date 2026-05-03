@@ -22,6 +22,10 @@
 
 enum {
   TK_NOTYPE = 256, TK_EQ,
+  TK_NUM,      // decimal number
+  TK_HEX,      // hex number
+  TK_REG,      // register
+  TK_DEREF,    // pointer dereference
 
   /* TODO: Add more token types */
 
@@ -38,6 +42,14 @@ static struct rule {
 
   {" +", TK_NOTYPE},    // spaces
   {"\\+", '+'},         // plus
+  {"-", '-'},           // minus
+  {"\\*", '*'},         // multiply (or dereference)
+  {"/", '/'},           // divide
+  {"\\(", '('},         // left parenthesis
+  {"\\)", ')'},         // right parenthesis
+  {"0x[0-9a-fA-F]+", TK_HEX},  // hex number
+  {"[0-9]+", TK_NUM},   // decimal number
+  {"\\$[a-zA-Z0-9]+", TK_REG}, // register
   {"==", TK_EQ},        // equal
 };
 
@@ -67,7 +79,7 @@ typedef struct token {
   char str[32];
 } Token;
 
-static Token tokens[32] __attribute__((used)) = {};
+static Token tokens[65536] __attribute__((used)) = {};
 static int nr_token __attribute__((used))  = 0;
 
 static bool make_token(char *e) {
@@ -95,7 +107,17 @@ static bool make_token(char *e) {
          */
 
         switch (rules[i].token_type) {
-          default: TODO();
+          case TK_NOTYPE:
+            // skip spaces
+            break;
+          default:
+            // record token
+            tokens[nr_token].type = rules[i].token_type;
+            int len = substr_len < 32 ? substr_len : 31;
+            strncpy(tokens[nr_token].str, substr_start, len);
+            tokens[nr_token].str[len] = '\0';
+            nr_token++;
+            break;
         }
 
         break;
@@ -111,6 +133,105 @@ static bool make_token(char *e) {
   return true;
 }
 
+/* Check if expression is surrounded by a matched pair of parentheses */
+static bool check_parentheses(int p, int q) {
+  if (tokens[p].type != '(' || tokens[q].type != ')') {
+    return false;
+  }
+
+  int balance = 0;
+  for (int i = p; i <= q; i++) {
+    if (tokens[i].type == '(') balance++;
+    else if (tokens[i].type == ')') balance--;
+    if (balance < 0) return false;
+  }
+
+  return (balance == 0);
+}
+
+/* Find the main operator in expression [p, q] */
+static int find_main_op(int p, int q) {
+  int op = -1;
+  int min_prio = 4; // * and / have priority 2, + and - have priority 3
+
+  // Find the operator with lowest priority that is not in parentheses
+  int balance = 0;
+  for (int i = p; i <= q; i++) {
+    if (tokens[i].type == '(') balance++;
+    else if (tokens[i].type == ')') balance--;
+    else if (balance == 0) {
+      // Not in parentheses, check if it's an operator
+      int prio = 0;
+      if (tokens[i].type == '+' || tokens[i].type == '-') prio = 3;
+      else if (tokens[i].type == '*' || tokens[i].type == '/') prio = 2;
+      else prio = 0;
+
+      if (prio > 0 && (op == -1 || prio <= min_prio)) {
+        op = i;
+        min_prio = prio;
+      }
+    }
+  }
+
+  return op;
+}
+
+/* Recursive expression evaluation */
+static uint32_t eval(int p, int q, bool *success) {
+  if (p > q) {
+    *success = false;
+    return 0;
+  }
+
+  if (p == q) {
+    // Single token - should be a number
+    if (tokens[p].type == TK_NUM) {
+      *success = true;
+      return (uint32_t)strtoul(tokens[p].str, NULL, 10);
+    } else if (tokens[p].type == TK_HEX) {
+      *success = true;
+      return (uint32_t)strtoul(tokens[p].str + 2, NULL, 16);
+    } else if (tokens[p].type == TK_REG) {
+      *success = true;
+      return isa_reg_str2val(tokens[p].str + 1, success);
+    } else {
+      *success = false;
+      return 0;
+    }
+  }
+
+  if (check_parentheses(p, q)) {
+    return eval(p + 1, q - 1, success);
+  }
+
+  int op = find_main_op(p, q);
+  if (op == -1) {
+    *success = false;
+    return 0;
+  }
+
+  uint32_t val1 = eval(p, op - 1, success);
+  if (!*success) return 0;
+
+  uint32_t val2 = eval(op + 1, q, success);
+  if (!*success) return 0;
+
+  switch (tokens[op].type) {
+    case '+': *success = true; return val1 + val2;
+    case '-': *success = true; return val1 - val2;
+    case '*': *success = true; return val1 * val2;
+    case '/':
+      if (val2 == 0) {
+        *success = false;
+        return 0;
+      }
+      *success = true;
+      return val1 / val2;
+    default:
+      *success = false;
+      return 0;
+  }
+}
 
 word_t expr(char *e, bool *success) {
   if (!make_token(e)) {
@@ -118,8 +239,6 @@ word_t expr(char *e, bool *success) {
     return 0;
   }
 
-  /* TODO: Insert codes to evaluate the expression. */
-  TODO();
-
-  return 0;
+  *success = true;
+  return (word_t)eval(0, nr_token - 1, success);
 }

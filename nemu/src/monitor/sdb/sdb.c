@@ -110,6 +110,21 @@ static int cmd_x(char *args) {
   return 0;
 }
 
+static int cmd_p(char *args) {
+  if (args == NULL) {
+    printf("Usage: p EXPR - evaluate expression\n");
+    return 0;
+  }
+  bool success = false;
+  word_t result = expr(args, &success);
+  if (success) {
+    printf("%u\n", result);
+  } else {
+    printf("Expression evaluation failed\n");
+  }
+  return 0;
+}
+
 static int cmd_q(char *args) {
   return -1;
 }
@@ -127,6 +142,7 @@ static struct {
   { "si", "Single step execution, N steps by default (1 step when N is not given)", cmd_si },
   { "info", "Print program status, 'r' for registers, 'w' for watchpoints", cmd_info },
   { "x", "Scan memory: x N EXPR, print N consecutive 4-bytes from address EXPR", cmd_x },
+  { "p", "Evaluate expression: p EXPR", cmd_p },
 
   /* TODO: Add more commands */
 
