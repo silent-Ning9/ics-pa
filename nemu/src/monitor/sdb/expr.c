@@ -152,7 +152,7 @@ static bool check_parentheses(int p, int q) {
 /* Find the main operator in expression [p, q] */
 static int find_main_op(int p, int q) {
   int op = -1;
-  int min_prio = 4; // Start with priority higher than any operator
+  int min_prio = 5; // Start with priority higher than any operator
 
   // Find the operator with lowest priority that is not in parentheses
   int balance = 0;
@@ -174,7 +174,7 @@ static int find_main_op(int p, int q) {
   }
 
   // Debug: print found main operator
-  printf("Main op at %d, type %d\n", op, op >= 0 ? tokens[op].type : -1);
+  // printf("Main op at %d, type %d\n", op, op >= 0 ? tokens[op].type : -1);
 
   return op;
 }
