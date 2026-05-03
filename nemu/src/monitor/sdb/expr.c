@@ -2,7 +2,7 @@
 * Copyright (c) 2014-2024 Zihao Yu, Nanjing University
 *
 * NEMU is licensed under Mulan PSL v2.
-* You can use this software according to the terms and conditions of the Mulan PSL v2.
+* You can use this software according to the terms and conditions of Mulan PSL v2.
 * You may obtain a copy of Mulan PSL v2 at:
 *          http://license.coscl.org.cn/MulanPSL2
 *
@@ -37,10 +37,10 @@ static struct rule {
 } rules[] = {
 
   /* TODO: Add more rules.
-   * Pay attention to the precedence level of different rules.
+   * Pay attention to precedence level of different rules.
    */
 
-  {" +", TK_NOTYPE},    /* spaces */
+  {" +", TK_NOTYPE},    // spaces
   {"\\+", '+'},         // plus
   {"-", '-'},           // minus
   {"\\*", '*'},         // multiply (or dereference)
@@ -116,8 +116,6 @@ static bool make_token(char *e) {
             int len = substr_len < 32 ? substr_len : 31;
             strncpy(tokens[nr_token].str, substr_start, len);
             tokens[nr_token].str[len] = '\0';
-            // Debug: print each token
-            printf("Token[%d]: type=%d, str='%s'\n", nr_token, tokens[nr_token].type, tokens[nr_token].str);
             nr_token++;
             break;
         }
@@ -168,12 +166,14 @@ static int find_main_op(int p, int q) {
       else if (tokens[i].type == '*' || tokens[i].type == '/') prio = 2;
       else prio = 0;
 
-      if (prio > 0 && prio < min_prio) {
-        op = i;
-        min_prio = prio;
-      } else if (prio > 0 && prio == min_prio) {
-        // Same priority: right-associative, choose the rightmost
-        op = i;
+      if (prio > 0) {
+        if (prio < min_prio) {
+          op = i;
+          min_prio = prio;
+        } else if (prio == min_prio) {
+          // Same priority: right-associative, choose the rightmost
+          op = i;
+        }
       }
     }
   }
@@ -224,9 +224,6 @@ static uint32_t eval(int p, int q, bool *success) {
 
   uint32_t val2 = eval(op + 1, q, success);
   if (!*success) return 0;
-
-  // Debug: print intermediate values
-  // printf("eval[%d,%d]: op=%d, val1=%u, val2=%u\n", p, q, op, val1, val2);
 
   switch (tokens[op].type) {
     case '+': *success = true; return val1 + val2;
