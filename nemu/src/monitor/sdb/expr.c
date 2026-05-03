@@ -166,9 +166,14 @@ static int find_main_op(int p, int q) {
       else if (tokens[i].type == '*' || tokens[i].type == '/') prio = 2;
       else prio = 0;
 
-      if (prio > 0 && prio <= min_prio) {
-        op = i;
-        min_prio = prio;
+      if (prio > 0) {
+        if (prio < min_prio) {
+          op = i;
+          min_prio = prio;
+        } else if (prio == min_prio) {
+          // Same priority: right-associative, choose the rightmost
+          op = i;
+        }
       }
     }
   }
