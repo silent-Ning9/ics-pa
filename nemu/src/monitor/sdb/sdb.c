@@ -115,6 +115,12 @@ static int cmd_p(char *args) {
     printf("Usage: p EXPR - evaluate expression\n");
     return 0;
   }
+  // Skip leading spaces in args
+  while (*args == ' ') args++;
+  if (*args == '\0') {
+    printf("Usage: p EXPR - evaluate expression\n");
+    return 0;
+  }
   bool success = false;
   word_t result = expr(args, &success);
   if (success) {
