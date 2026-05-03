@@ -219,6 +219,9 @@ static uint32_t eval(int p, int q, bool *success) {
   uint32_t val2 = eval(op + 1, q, success);
   if (!*success) return 0;
 
+  // Debug: print intermediate values
+  printf("eval[%d,%d]: op=%d, val1=%u, val2=%u\n", p, q, op, val1, val2);
+
   switch (tokens[op].type) {
     case '+': *success = true; return val1 + val2;
     case '-': *success = true; return val1 - val2;
