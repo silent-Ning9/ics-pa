@@ -143,7 +143,14 @@ static bool check_parentheses(int p, int q) {
   for (int i = p; i <= q; i++) {
     if (tokens[i].type == '(') balance++;
     else if (tokens[i].type == ')') balance--;
+    
     if (balance < 0) return false;
+    
+    // 关键修复：如果在到达最后一个字符之前，括号的匹配度已经降到了 0，
+    // 说明首尾的括号并不是相互匹配的一对 (例如 "(1) + (2)")。
+    if (balance == 0 && i != q) {
+      return false;
+    }
   }
 
   return (balance == 0);
@@ -162,7 +169,10 @@ static int find_main_op(int p, int q) {
     else if (balance == 0) {
       // Not in parentheses, check if it's an operator
       int prio = 0;
-      if (tokens[i].type == '+' || tokens[i].type == '-') prio = 3;
+      
+      // 关键修复：+ 和 - 的优先级更低，意味着它们应该被“最后”计算，
+      // 所以应该赋予它们更小的值，这样才能被 min_prio 捕获，作为主运算符（树的根）。
+      if (tokens[i].type == '+' || tokens[i].type == '-') prio = 1;
       else if (tokens[i].type == '*' || tokens[i].type == '/') prio = 2;
       else prio = 0;
 
@@ -171,7 +181,8 @@ static int find_main_op(int p, int q) {
           op = i;
           min_prio = prio;
         } else if (prio == min_prio) {
-          // Same priority: right-associative, choose the rightmost
+          // 同等优先级：选择最右侧的运算符作为主运算符，
+          // 因为在语法树中最后计算右侧，这恰好实现了运算的“左结合性”(Left-associative)。
           op = i;
         }
       }
