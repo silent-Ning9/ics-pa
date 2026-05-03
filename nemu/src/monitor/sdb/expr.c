@@ -156,11 +156,11 @@ static int find_main_op(int p, int q) {
 
   // Find the operator with lowest priority that is not in parentheses
   int balance = 0;
-  for (int i = p; i <= q; i++) {
+  for (int i = 0; i < nr_token; i++) {
     if (tokens[i].type == '(') balance++;
     else if (tokens[i].type == ')') balance--;
-    else if (balance == 0) {
-      // Not in parentheses, check if it's an operator
+    else if (balance == 0 && i >= p && i <= q) {
+      // Not in parentheses and in range [p, q], check if it's an operator
       int prio = 0;
       if (tokens[i].type == '+' || tokens[i].type == '-') prio = 3;
       else if (tokens[i].type == '*' || tokens[i].type == '/') prio = 2;
