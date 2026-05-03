@@ -152,7 +152,7 @@ static bool check_parentheses(int p, int q) {
 /* Find the main operator in expression [p, q] */
 static int find_main_op(int p, int q) {
   int op = -1;
-  int min_prio = 4; // * and / have priority 2, + and - have priority 3
+  int min_prio = 4; // Start with priority higher than any operator
 
   // Find the operator with lowest priority that is not in parentheses
   int balance = 0;
@@ -166,7 +166,7 @@ static int find_main_op(int p, int q) {
       else if (tokens[i].type == '*' || tokens[i].type == '/') prio = 2;
       else prio = 0;
 
-      if (prio > 0 && (op == -1 || prio <= min_prio)) {
+      if (prio > 0 && prio < min_prio) {
         op = i;
         min_prio = prio;
       }
