@@ -166,7 +166,7 @@ static int find_main_op(int p, int q) {
       else if (tokens[i].type == '*' || tokens[i].type == '/') prio = 2;
       else prio = 0;
 
-      if (prio > 0 && prio < min_prio) {
+      if (prio > 0 && prio <= min_prio) {
         op = i;
         min_prio = prio;
       }
