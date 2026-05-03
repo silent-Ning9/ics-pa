@@ -116,6 +116,8 @@ static bool make_token(char *e) {
             int len = substr_len < 32 ? substr_len : 31;
             strncpy(tokens[nr_token].str, substr_start, len);
             tokens[nr_token].str[len] = '\0';
+            // Debug: print each token
+            printf("Token[%d]: type=%d, str='%s'\n", nr_token, tokens[nr_token].type, tokens[nr_token].str);
             nr_token++;
             break;
         }
