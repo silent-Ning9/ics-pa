@@ -14,6 +14,8 @@
 ***************************************************************************************/
 
 #include <isa.h>
+#include <memory/paddr.h>
+#include <memory/vaddr.h>
 #include <string.h>
 
 /* We use the POSIX regex functions to process regular expressions.
@@ -23,10 +25,12 @@
 
 enum {
   TK_NOTYPE = 256, TK_EQ,
+  TK_NEQ, TK_AND,
   TK_NUM,      // decimal number
   TK_HEX,      // hex number
   TK_REG,      // register
   TK_DEREF,    // pointer dereference
+  TK_NEG,      // unary minus
 
   /* TODO: Add more token types */
 
@@ -46,12 +50,14 @@ static struct rule {
   {"-", '-'},           // minus
   {"\\*", '*'},         // multiply (or dereference)
   {"/", '/'},           // divide
+  {"&&", TK_AND},       // and
+  {"!=", TK_NEQ},       // not equal
+  {"==", TK_EQ},        // equal
   {"\\(", '('},         // left parenthesis
   {"\\)", ')'},         // right parenthesis
   {"0x[0-9a-fA-F]+", TK_HEX},  // hex number
   // {"[0-9]+", TK_NUM},   // decimal number
   {"\\$[a-zA-Z0-9]+", TK_REG}, // register
-  {"==", TK_EQ},        // equal
   // 注意最后的 [uU]? 表示可选的字符 u 或 U
   {"[0-9]+[uU]?", TK_NUM},
 };
@@ -184,8 +190,10 @@ static int find_main_op(int p, int q) {
     else if (balance == 0) {
       int prio = 0;
 
-      if (tokens[i].type == '+' || tokens[i].type == '-') prio = 1;
-      else if (tokens[i].type == '*' || tokens[i].type == '/') prio = 2;
+      if (tokens[i].type == TK_AND) prio = 1;
+      else if (tokens[i].type == TK_EQ || tokens[i].type == TK_NEQ) prio = 2;
+      else if (tokens[i].type == '+' || tokens[i].type == '-') prio = 3;
+      else if (tokens[i].type == '*' || tokens[i].type == '/') prio = 4;
       else prio = 0;
 
       if (prio > 0) {
@@ -236,6 +244,22 @@ static uint32_t eval(int p, int q, bool *success) {
 
   int op = find_main_op(p, q);
   if (op == -1) {
+    if (tokens[p].type == TK_NEG) {
+      uint32_t val = eval(p + 1, q, success);
+      if (!*success) return 0;
+      *success = true;
+      return (uint32_t)(-(int32_t)val);
+    }
+    if (tokens[p].type == TK_DEREF) {
+      uint32_t addr = eval(p + 1, q, success);
+      if (!*success) return 0;
+      if (!in_pmem(addr)) {
+        *success = false;
+        return 0;
+      }
+      *success = true;
+      return vaddr_read((vaddr_t)addr, 4);
+    }
     *success = false;
     return 0;
   }
@@ -247,6 +271,9 @@ static uint32_t eval(int p, int q, bool *success) {
   if (!*success) return 0;
 
   switch (tokens[op].type) {
+    case TK_AND: *success = true; return (val1 && val2);
+    case TK_EQ: *success = true; return (val1 == val2);
+    case TK_NEQ: *success = true; return (val1 != val2);
     case '+': *success = true; return val1 + val2;
     case '-': *success = true; return val1 - val2;
     case '*': *success = true; return val1 * val2;
@@ -267,6 +294,29 @@ word_t expr(char *e, bool *success) {
   if (!make_token(e)) {
     *success = false;
     return 0;
+  }
+
+  for (int i = 0; i < nr_token; i++) {
+    if (tokens[i].type == '*') {
+      if (i == 0 ||
+          tokens[i - 1].type == '+' || tokens[i - 1].type == '-' ||
+          tokens[i - 1].type == '*' || tokens[i - 1].type == '/' ||
+          tokens[i - 1].type == TK_EQ || tokens[i - 1].type == TK_NEQ ||
+          tokens[i - 1].type == TK_AND || tokens[i - 1].type == '(' ||
+          tokens[i - 1].type == TK_DEREF || tokens[i - 1].type == TK_NEG) {
+        tokens[i].type = TK_DEREF;
+      }
+    }
+    else if (tokens[i].type == '-') {
+      if (i == 0 ||
+          tokens[i - 1].type == '+' || tokens[i - 1].type == '-' ||
+          tokens[i - 1].type == '*' || tokens[i - 1].type == '/' ||
+          tokens[i - 1].type == TK_EQ || tokens[i - 1].type == TK_NEQ ||
+          tokens[i - 1].type == TK_AND || tokens[i - 1].type == '(' ||
+          tokens[i - 1].type == TK_DEREF || tokens[i - 1].type == TK_NEG) {
+        tokens[i].type = TK_NEG;
+      }
+    }
   }
 
   *success = true;

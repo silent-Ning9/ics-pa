@@ -72,8 +72,7 @@ static int cmd_info(char *args) {
     return 0;
   }
   if (strcmp(args, "w") == 0) {
-    // TODO: implement watchpoint display
-    printf("Watchpoint display not implemented yet\n");
+    wp_display();
     return 0;
   }
   printf("Unknown subcommand '%s'\n", args);
@@ -96,15 +95,19 @@ static int cmd_x(char *args) {
     printf("Invalid N: %s\n", n_str);
     return 0;
   }
-  // Simplified version: EXPR is just a hex number
-  paddr_t addr;
-  if (sscanf(expr_str, "%x", &addr) != 1) {
-    printf("Invalid expression: %s (expect hex number)\n", expr_str);
+  bool success = false;
+  word_t addr = expr(expr_str, &success);
+  if (!success) {
+    printf("Invalid expression: %s\n", expr_str);
     return 0;
   }
   for (int i = 0; i < n; i++) {
+    if (!in_pmem(addr)) {
+      printf("Address " FMT_WORD " is out of pmem range\n", addr);
+      return 0;
+    }
     word_t data = paddr_read(addr, 4);
-    printf("0x%08x: 0x%08x\n", addr, data);
+    printf(FMT_WORD ": " FMT_WORD "\n", addr, data);
     addr += 4;
   }
   return 0;
@@ -135,6 +138,29 @@ static int cmd_q(char *args) {
   return -1;
 }
 
+static int cmd_w(char *args) {
+  if (args == NULL) {
+    printf("Usage: w EXPR - set watchpoint\n");
+    return 0;
+  }
+  if (!wp_add(args)) {
+    printf("Failed to create watchpoint: %s\n", args);
+  }
+  return 0;
+}
+
+static int cmd_d(char *args) {
+  if (args == NULL) {
+    printf("Usage: d N - delete watchpoint N\n");
+    return 0;
+  }
+  int no = atoi(args);
+  if (no < 0 || !wp_delete(no)) {
+    printf("No watchpoint %d\n", no);
+  }
+  return 0;
+}
+
 static int cmd_help(char *args);
 
 static struct {
@@ -149,6 +175,8 @@ static struct {
   { "info", "Print program status, 'r' for registers, 'w' for watchpoints", cmd_info },
   { "x", "Scan memory: x N EXPR, print N consecutive 4-bytes from address EXPR", cmd_x },
   { "p", "Evaluate expression: p EXPR", cmd_p },
+  { "w", "Set watchpoint: w EXPR", cmd_w },
+  { "d", "Delete watchpoint: d N", cmd_d },
 
   /* TODO: Add more commands */
 
