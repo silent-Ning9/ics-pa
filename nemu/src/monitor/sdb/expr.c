@@ -14,6 +14,7 @@
 ***************************************************************************************/
 
 #include <isa.h>
+#include <string.h>
 
 /* We use the POSIX regex functions to process regular expressions.
  * Type 'man regex' for more information about POSIX regex functions.
@@ -113,9 +114,13 @@ static bool make_token(char *e) {
             // skip spaces
             break;
           default:
+            Assert(nr_token < ARRLEN(tokens), "too many tokens in expression");
             // record token
             tokens[nr_token].type = rules[i].token_type;
-            int len = substr_len < 32 ? substr_len : 31;
+            int len = substr_len < (int)sizeof(tokens[nr_token].str) ?
+              substr_len : (int)sizeof(tokens[nr_token].str) - 1;
+            Assert(substr_len < (int)sizeof(tokens[nr_token].str),
+              "token is too long: %.*s", substr_len, substr_start);
             strncpy(tokens[nr_token].str, substr_start, len);
             tokens[nr_token].str[len] = '\0';
             nr_token++;
@@ -135,6 +140,16 @@ static bool make_token(char *e) {
   return true;
 }
 
+static bool validate_parentheses(int p, int q) {
+  int balance = 0;
+  for (int i = p; i <= q; i++) {
+    if (tokens[i].type == '(') balance++;
+    else if (tokens[i].type == ')') balance--;
+    if (balance < 0) return false;
+  }
+  return balance == 0;
+}
+
 /* Check if expression is surrounded by a matched pair of parentheses */
 static bool check_parentheses(int p, int q) {
   if (tokens[p].type != '(' || tokens[q].type != ')') {
@@ -145,11 +160,10 @@ static bool check_parentheses(int p, int q) {
   for (int i = p; i <= q; i++) {
     if (tokens[i].type == '(') balance++;
     else if (tokens[i].type == ')') balance--;
-    
+
     if (balance < 0) return false;
-    
-    // 关键修复：如果在到达最后一个字符之前，括号的匹配度已经降到了 0，
-    // 说明首尾的括号并不是相互匹配的一对 (例如 "(1) + (2)")。
+
+    // if balance reaches 0 before q, the outermost pair does not wrap [p, q]
     if (balance == 0 && i != q) {
       return false;
     }
@@ -161,19 +175,15 @@ static bool check_parentheses(int p, int q) {
 /* Find the main operator in expression [p, q] */
 static int find_main_op(int p, int q) {
   int op = -1;
-  int min_prio = 5; // Start with priority higher than any operator
+  int min_prio = 5;
 
-  // Find the operator with lowest priority that is not in parentheses
   int balance = 0;
   for (int i = p; i <= q; i++) {
     if (tokens[i].type == '(') balance++;
     else if (tokens[i].type == ')') balance--;
     else if (balance == 0) {
-      // Not in parentheses, check if it's an operator
       int prio = 0;
-      
-      // 关键修复：+ 和 - 的优先级更低，意味着它们应该被“最后”计算，
-      // 所以应该赋予它们更小的值，这样才能被 min_prio 捕获，作为主运算符（树的根）。
+
       if (tokens[i].type == '+' || tokens[i].type == '-') prio = 1;
       else if (tokens[i].type == '*' || tokens[i].type == '/') prio = 2;
       else prio = 0;
@@ -182,15 +192,12 @@ static int find_main_op(int p, int q) {
         if (prio < min_prio) {
           op = i;
           min_prio = prio;
-        } else if (prio == min_prio) {
-          // 同等优先级：选择最右侧的运算符作为主运算符，
-          // 因为在语法树中最后计算右侧，这恰好实现了运算的“左结合性”(Left-associative)。
-          op = i;
-        }
+        } else if (prio == min_prio) op = i;
       }
     }
   }
 
+  if (balance != 0) return -1;
   return op;
 }
 
@@ -222,12 +229,13 @@ static uint32_t eval(int p, int q, bool *success) {
     return eval(p + 1, q - 1, success);
   }
 
+  if (!validate_parentheses(p, q)) {
+    *success = false;
+    return 0;
+  }
+
   int op = find_main_op(p, q);
   if (op == -1) {
-    // No operator found, single token
-    if (p == q) {
-      return eval(p, q, success);
-    }
     *success = false;
     return 0;
   }
